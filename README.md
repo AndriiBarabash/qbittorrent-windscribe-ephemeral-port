@@ -5,11 +5,16 @@ Also exports the new port as iptables rule for Gluetun.
 
 This repo is for qbittorrent only. For Deluge, check out the original repo this qbittorrent version is forked from: [deluge-windscribe-ephemeral-port](https://github.com/dumbasPL/deluge-windscribe-ephemeral-port)
 
-
 ## Important information
 
 This project was designed to work along side containers like [linuxserver/qbittorrent](https://docs.linuxserver.io/images/docker-qbittorrent) in mind.  
-It will not help you route qbittorrent traffic through a VPN! For that, you can use [qdm12/gluetun](https://github.com/qdm12/gluetun). What it will do is to update the listening port of qbittorrent to the allocated Windscribe port.
+It will not help you route qbittorrent traffic through a VPN! For that, you can use [qdm12/gluetun](https://github.com/qdm12/gluetun). What it will do is to update the listening port of qbittorrent and export iptables rules for Gluetun.
+
+## ⚠️ Docker API Security Notice
+
+If you want the new Gluetun container to pick up the iptables changes, you have to restart the Gluetun container. It's a supported feature, but to use it you **must** mount the Docker socket (`/var/run/docker.sock`) into this container.
+> **Warning:** Mounting the Docker socket gives the container full control of your Docker host.  
+> Only use this feature if you trust the container and code!
 
 # Configuration
 
@@ -29,6 +34,8 @@ Configuration is done using environment variables
 | CACHE_DIR | A directory where to store cached data like windscribe session cookies | NO | `/cache` in the docker container and `./cache` everywhere else |
 | GLUETUN_DIR | A directory where to write iptables entry for gluetun | NO | `/post-rules.txt` in the docker container and `./post-rules.txt` everywhere else |
 | GLUETUN_IFACE | Gluetun vpn interface name | NO | `tun0` |
+| GLUETUN_CONTAINER_NAME | Name of the Gluetun Docker container to restart. If set, the app will try to restart the container after updating iptables rules. Both container names are required | NO | |
+| QBITTORRENT_CONTAINER_NAME | Name of the qbittorrent Docker container to restart. If set, the app will try to restart the container after updating iptables rules. Both container names are required | NO | |
 
 # Running
 
@@ -44,6 +51,8 @@ services:
       - windscribe-cache:/cache
       # optional
       # - ./post-rules.txt:/app/post-rules.txt
+      # mounting docker socket is required for container restart feature
+      # - /var/run/docker.sock:/var/run/docker.sock
     environment:
       - WINDSCRIBE_USERNAME=<your windscribe username>
       - WINDSCRIBE_PASSWORD=<your windscribe password>
@@ -59,6 +68,8 @@ services:
       # - CACHE_DIR=/cache
       # - GLUETUN_DIR=/post-rules.txt
       # - GLUETUN_IFACE=tun0
+      # - GLUETUN_CONTAINER_NAME=gluetun
+      # - QBITTORRENT_CONTAINER_NAME=qbittorrent
 
 volumes:
   windscribe-cache:
@@ -85,6 +96,8 @@ CLIENT_PASSWORD=<password for the qbittorrent Web UI>
 # WINDSCRIBE_EXTRA_DELAY=60000
 # CRON_SCHEDULE=
 # CACHE_DIR=./cache
+# GLUETUN_CONTAINER_NAME=gluetun
+# QBITTORRENT_CONTAINER_NAME=qbittorrent
 ```
 4. Build and start using `yarn install`
 

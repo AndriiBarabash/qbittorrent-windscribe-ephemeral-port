@@ -1,4 +1,3 @@
-
 interface ConfigTemplate<T extends string | number> {
   envVariableName: string,
   type: T extends string ? typeof String : typeof Number,
@@ -78,6 +77,16 @@ const configTemplate = {
     envVariableName: 'GLUETUN_DIR',
     required: false,
     default: './post-rules.txt',
+    type: String,
+  } as ConfigTemplateOptionalEntry<string>,
+  gluetunContainerName: {
+    envVariableName: 'GLUETUN_CONTAINER_NAME',
+    required: false,
+    type: String,
+  } as ConfigTemplateOptionalEntry<string>,
+  qbittorrentContainerName: {
+    envVariableName: 'QBITTORRENT_CONTAINER_NAME',
+    required: false,
     type: String,
   } as ConfigTemplateOptionalEntry<string>,
 };

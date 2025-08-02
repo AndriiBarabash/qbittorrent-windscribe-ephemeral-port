@@ -1,14 +1,18 @@
 import 'dotenv/config';
 import path from 'path';
-import {KeyvFile} from 'keyv-file';
-import {getConfig} from './config.js';
-import {QBittorrentClient} from './QBittorrentClient.js';
-import {WindscribeClient, WindscribePort} from './WindscribeClient.js';
-import {schedule} from 'node-cron';
+import { KeyvFile } from 'keyv-file';
+import { getConfig } from './config.js';
+import { QBittorrentClient } from './QBittorrentClient.js';
+import { WindscribeClient, WindscribePort } from './WindscribeClient.js';
+import { schedule } from 'node-cron';
 import * as fs from 'fs';
+import Docker from 'dockerode';
 
 // load config
 const config = getConfig();
+
+// Docker client setup
+const docker = config.gluetunContainerName && config.qbittorrentContainerName ? new Docker({ socketPath: '/var/run/docker.sock' }) : null;
 
 // init cache (if configured)
 const cache = !config.cacheDir ? undefined : new KeyvFile({
@@ -23,7 +27,7 @@ const client = new QBittorrentClient(config.clientUrl, config.clientUsername, co
 
 // init schedule if configured
 const scheduledTask = !config.cronSchedule ? null :
-  schedule(config.cronSchedule, () => run('schedule'), {scheduled: false});
+  schedule(config.cronSchedule, () => run('schedule'), { scheduled: false });
 
 async function update() {
   let nextRetry: Date = null;
@@ -65,6 +69,23 @@ async function update() {
         }
         // write the new port to configured gluetunCfgDir.
         writeExportedPort(config.gluetunIface, currentPort);
+
+        // restart containers if configured
+        if (docker) {
+          docker.getContainer(config.gluetunContainerName)
+            .restart()
+            .then(() => {
+              console.log(`Restarted Gluetun container: ${config.gluetunContainerName}`);
+              return docker.getContainer(config.qbittorrentContainerName).restart();
+            })
+            .then(() => {
+              console.log(`Restarted qbittorrent container: ${config.qbittorrentContainerName}`);
+            })
+            .catch((err) => {
+              console.error('Failed to restart container:', err);
+            });
+        }
+
         console.log('torrent port updated');
       }
     } else {
@@ -92,7 +113,7 @@ async function run(trigger: string) {
   clearTimeout(timeoutId);
 
   // the magic
-  const {nextRun, nextRetry} = await update().catch(error => {
+  const { nextRun, nextRetry } = await update().catch(error => {
     // in theory this should never throw, if it does we have bigger problems
     console.error(error);
     process.exit(1);
