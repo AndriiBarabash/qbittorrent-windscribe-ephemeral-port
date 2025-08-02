@@ -7,8 +7,17 @@ import {WindscribeClient, WindscribePort} from './WindscribeClient.js';
 import {schedule} from 'node-cron';
 import * as fs from 'fs';
 
+// Docker API integration
+import Docker from 'dockerode';
+
 // load config
 const config = getConfig();
+
+// Docker client setup
+let dockerClient: Docker | null = null;
+if (config.gluetunContainerName) {
+  dockerClient = new Docker({socketPath: '/var/run/docker.sock'});
+}
 
 // init cache (if configured)
 const cache = !config.cacheDir ? undefined : new KeyvFile({
@@ -65,6 +74,18 @@ async function update() {
         }
         // write the new port to configured gluetunCfgDir.
         writeExportedPort(config.gluetunIface, currentPort);
+
+        // New Feature: Restart Gluetun container if configured
+        if (dockerClient && config.gluetunContainerName) {
+          try {
+            const container = dockerClient.getContainer(config.gluetunContainerName);
+            await container.restart();
+            console.log(`Gluetun container '${config.gluetunContainerName}' restarted successfully.`);
+          } catch (err) {
+            console.error(`Failed to restart Gluetun container '${config.gluetunContainerName}':`, err);
+          }
+        }
+
         console.log('torrent port updated');
       }
     } else {
@@ -135,8 +156,7 @@ async function run(trigger: string) {
  * @param {number} port    Port forwarded port number
  */
 function writeExportedPort(iface: string, port: number) {
-  const iptablesStr = `iptables -A INPUT -i ${iface} -p tcp --dport ${port} -j ACCEPT
-iptables -A INPUT -i ${iface} -p udp --dport ${port} -j ACCEPT`;
+  const iptablesStr = `iptables -A INPUT -i ${iface} -p tcp --dport ${port} -j ACCEPT\niptables -A INPUT -i ${iface} -p udp --dport ${port} -j ACCEPT`;
   fs.writeFileSync(config.gluetunCfgDir, iptablesStr, {
     flag: 'w',
   });
