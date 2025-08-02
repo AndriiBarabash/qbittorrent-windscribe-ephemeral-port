@@ -6,18 +6,13 @@ import {QBittorrentClient} from './QBittorrentClient.js';
 import {WindscribeClient, WindscribePort} from './WindscribeClient.js';
 import {schedule} from 'node-cron';
 import * as fs from 'fs';
-
-// Docker API integration
 import Docker from 'dockerode';
 
 // load config
 const config = getConfig();
 
 // Docker client setup
-let dockerClient: Docker | null = null;
-if (config.gluetunContainerName) {
-  dockerClient = new Docker({socketPath: '/var/run/docker.sock'});
-}
+const docker = config.gluetunContainerName ? new Docker({ socketPath: '/var/run/docker.sock' }) : null;
 
 // init cache (if configured)
 const cache = !config.cacheDir ? undefined : new KeyvFile({
@@ -75,15 +70,16 @@ async function update() {
         // write the new port to configured gluetunCfgDir.
         writeExportedPort(config.gluetunIface, currentPort);
 
-        // New Feature: Restart Gluetun container if configured
-        if (dockerClient && config.gluetunContainerName) {
-          try {
-            const container = dockerClient.getContainer(config.gluetunContainerName);
-            await container.restart();
-            console.log(`Gluetun container '${config.gluetunContainerName}' restarted successfully.`);
-          } catch (err) {
-            console.error(`Failed to restart Gluetun container '${config.gluetunContainerName}':`, err);
-          }
+        // restart gluetun container if configured
+        if (docker && config.gluetunContainerName) {
+          docker.getContainer(config.gluetunContainerName)
+          .restart()
+          .then(() => {
+            console.log(`Restarted Gluetun container: ${config.gluetunContainerName}`);
+          })
+          .catch((err) => {
+            console.error('Failed to restart Gluetun container:', err);
+          });
         }
 
         console.log('torrent port updated');
