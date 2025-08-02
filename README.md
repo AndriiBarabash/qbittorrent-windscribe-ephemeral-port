@@ -34,7 +34,8 @@ Configuration is done using environment variables
 | CACHE_DIR | A directory where to store cached data like windscribe session cookies | NO | `/cache` in the docker container and `./cache` everywhere else |
 | GLUETUN_DIR | A directory where to write iptables entry for gluetun | NO | `/post-rules.txt` in the docker container and `./post-rules.txt` everywhere else |
 | GLUETUN_IFACE | Gluetun vpn interface name | NO | `tun0` |
-| GLUETUN_CONTAINER_NAME | Name of the Gluetun Docker container to restart. If set, the app will try to restart the container after updating iptables rules. | NO | |
+| GLUETUN_CONTAINER_NAME | Name of the Gluetun Docker container to restart. If set, the app will try to restart the container after updating iptables rules. Both container names are required | NO | |
+| QBITTORRENT_CONTAINER_NAME | Name of the qbittorrent Docker container to restart. If set, the app will try to restart the container after updating iptables rules. Both container names are required | NO | |
 
 # Running
 
@@ -68,6 +69,7 @@ services:
       # - GLUETUN_DIR=/post-rules.txt
       # - GLUETUN_IFACE=tun0
       # - GLUETUN_CONTAINER_NAME=gluetun
+      # - QBITTORRENT_CONTAINER_NAME=qbittorrent
 
 volumes:
   windscribe-cache:
@@ -95,6 +97,7 @@ CLIENT_PASSWORD=<password for the qbittorrent Web UI>
 # CRON_SCHEDULE=
 # CACHE_DIR=./cache
 # GLUETUN_CONTAINER_NAME=gluetun
+# QBITTORRENT_CONTAINER_NAME=qbittorrent
 ```
 4. Build and start using `yarn install`
 
