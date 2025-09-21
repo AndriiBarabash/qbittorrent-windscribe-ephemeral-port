@@ -116,46 +116,43 @@ export class WindscribeClient {
         url: 'https://windscribe.com/login',
         maxTimeout: 60000,
       };
-      const getResponse = await axios.post(this.flaresolverrUrl, getPayload, {headers: {'Content-Type': 'application/json'}});
-      if (getResponse.data.status !== 'ok') {
-        throw new Error(`FlareSolverr failed for GET /login: ${getResponse.data.message}`);
+      const flareResponse = await axios.post(this.flaresolverrUrl, getPayload, {headers: {'Content-Type': 'application/json'}});
+      if (flareResponse.data.status !== 'ok') {
+        throw new Error(`FlareSolverr failed for GET /login: ${flareResponse.data.message}`);
       }
-      const solution = getResponse.data.solution;
-      const cfCookies = solution.cookies.reduce((acc: string[], c: any) => {
-        if (c.name.startsWith('cf_') || c.name.startsWith('__cf')) acc.push(`${c.name}=${c.value}`);
-        return acc;
-      }, []);
-      const cfUserAgent = solution.userAgent;
-
-      if (cfCookies.length === 0) {
+      if (!flareResponse.data.solution.cookies.some(({name}) => name.startsWith('cf_'))) {
         throw new Error('No Cloudflare clearance cookies found in FlareSolverr response');
       }
+      console.log('Successfully solved CF challenge using FlareSolverr');
 
-      const cfCookieString = cfCookies.join('; ');
+      const cfCookies = flareResponse.data.solution.cookies
+        .map(({name, value}) =>`${name}=${value}`)
+        .join('; ');
+      const cfUserAgent = flareResponse.data.solution.userAgent;
 
       // Step 2: Get CSRF token/time using CF cookies and UA (to associate with the session)
-      let csrfDataObj: { csrf_time: number; csrf_token: string };
+      let csrfData: { csrf_time: number; csrf_token: string };
       try {
-        const {data: csrfData} = await axios.post<{ csrf_token: string; csrf_time: number }>('https://res.windscribe.com/res/logintoken', null, {
+        const csrfResponse = await axios.post<typeof csrfData>('https://res.windscribe.com/res/logintoken', null, {
           headers: {
             'User-Agent': cfUserAgent,
-            'Cookie': cfCookieString,
+            'Cookie': cfCookies,
             'Accept': 'application/json, text/plain, */*',
             'Referer': 'https://windscribe.com/login',
             'Origin': 'https://windscribe.com',
           },
         });
-        csrfDataObj = {csrf_time: csrfData.csrf_time, csrf_token: csrfData.csrf_token};
-      } catch (csrfError) {
-        throw new Error(`Failed to fetch CSRF with CF bypass: ${csrfError.message}`);
+        csrfData = csrfResponse.data;
+      } catch (err) {
+        throw new Error(`Failed to fetch CSRF: ${err.message}`);
       }
 
       // Step 3: Perform actual POST with CF cookies, matching UA, and additional browser-like headers
       const loginFormData = qs.stringify({
         login: '1',
         upgrade: '0',
-        csrf_time: csrfDataObj.csrf_time,
-        csrf_token: csrfDataObj.csrf_token,
+        csrf_time: csrfData.csrf_time,
+        csrf_token: csrfData.csrf_token,
         username: this.username,
         password: this.password,
         code: '',
@@ -164,7 +161,7 @@ export class WindscribeClient {
         headers: {
           'Content-Type': 'application/x-www-form-urlencoded',
           'User-Agent': cfUserAgent,
-          'Cookie': cfCookieString,
+          'Cookie': cfCookies,
           'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7',
           'Accept-Language': 'en-US,en;q=0.9',
           'Origin': 'https://windscribe.com',
@@ -197,7 +194,7 @@ export class WindscribeClient {
         throw new Error('Failed to find ws_session_auth_hash in Set-Cookie');
       }
 
-      console.log('Successfully logged in with CF bypass');
+      console.log('Successfully got login cookies');
       return wsSessionCookie;
     } catch (error) {
       throw new Error(`Failed to log into windscribe: ${error.message}`);
