@@ -1,10 +1,10 @@
 import 'dotenv/config';
 import path from 'path';
-import { KeyvFile } from 'keyv-file';
-import { getConfig } from './config.js';
-import { QBittorrentClient } from './QBittorrentClient.js';
-import { WindscribeClient, WindscribePort } from './WindscribeClient.js';
-import { schedule } from 'node-cron';
+import {KeyvFile} from 'keyv-file';
+import {getConfig} from './config.js';
+import {QBittorrentClient} from './QBittorrentClient.js';
+import {WindscribeClient, WindscribePort} from './WindscribeClient.js';
+import {schedule} from 'node-cron';
 import * as fs from 'fs';
 import Docker from 'dockerode';
 
@@ -12,7 +12,7 @@ import Docker from 'dockerode';
 const config = getConfig();
 
 // Docker client setup
-const docker = config.gluetunContainerName && config.qbittorrentContainerName ? new Docker({ socketPath: '/var/run/docker.sock' }) : null;
+const docker = config.gluetunContainerName && config.qbittorrentContainerName ? new Docker({socketPath: '/var/run/docker.sock'}) : null;
 
 // init cache (if configured)
 const cache = !config.cacheDir ? undefined : new KeyvFile({
@@ -20,14 +20,14 @@ const cache = !config.cacheDir ? undefined : new KeyvFile({
 });
 
 // inti windscribe client
-const windscribe = new WindscribeClient(config.windscribeUsername, config.windscribePassword, cache);
+const windscribe = new WindscribeClient(config.windscribeUsername, config.windscribePassword, config.flaresolverrUrl, cache);
 
 // init torrent client
 const client = new QBittorrentClient(config.clientUrl, config.clientUsername, config.clientPassword);
 
 // init schedule if configured
 const scheduledTask = !config.cronSchedule ? null :
-  schedule(config.cronSchedule, () => run('schedule'), { scheduled: false });
+  schedule(config.cronSchedule, () => run('schedule'), {scheduled: false});
 
 async function update() {
   let nextRetry: Date = null;
@@ -81,7 +81,7 @@ async function update() {
             .then(() => {
               console.log(`Restarted qbittorrent container: ${config.qbittorrentContainerName}`);
             })
-            .catch((err) => {
+            .catch(err => {
               console.error('Failed to restart container:', err);
             });
         }
@@ -113,7 +113,7 @@ async function run(trigger: string) {
   clearTimeout(timeoutId);
 
   // the magic
-  const { nextRun, nextRetry } = await update().catch(error => {
+  const {nextRun, nextRetry} = await update().catch(error => {
     // in theory this should never throw, if it does we have bigger problems
     console.error(error);
     process.exit(1);

@@ -1,29 +1,42 @@
-# [qbittorrent-windscribe-ephemeral-port](https://github.com/EnumC/qbittorrent-windscribe-ephemeral-port)
+# [qbittorrent-windscribe-ephemeral-port](https://github.com/AndriiBarabash/qbittorrent-windscribe-ephemeral-port)
 
+## Disclaimer
+This project is not intended to be taken as a serious or professionally maintained solution.
+It is provided "as is" for educational or experimental purposes only.
+The author assumes no responsibility for any issues, damages, or legal consequences arising from its use, including but not limited to misuse, security vulnerabilities, or compatibility problems.
+
+Use at your own risk.
+
+## Introduction
 Automatically create ephemeral ports in windscribe and update qbittorrent config to use the new port.
 Also exports the new port as iptables rule for Gluetun.
 
 This repo is for qbittorrent only. For Deluge, check out the original repo this qbittorrent version is forked from: [deluge-windscribe-ephemeral-port](https://github.com/dumbasPL/deluge-windscribe-ephemeral-port)
 
-## Important information
+## Prerequisites
+Before using this project, you must deploy [FlareSolverr](https://github.com/FlareSolverr/FlareSolverr). 
+FlareSolverr is a proxy server that is used to bypass Cloudflare challenge, which is required to Windscribe's login. 
+Without FlareSolverr, the script cannot successfully authenticate due to Cloudflare's bot mitigation. 
 
+Deploy it on your server (e.g., via Docker) and ensure it’s accessible to this script.
+
+## Important information
 This project was designed to work along side containers like [linuxserver/qbittorrent](https://docs.linuxserver.io/images/docker-qbittorrent) in mind.  
 It will not help you route qbittorrent traffic through a VPN! For that, you can use [qdm12/gluetun](https://github.com/qdm12/gluetun). What it will do is to update the listening port of qbittorrent and export iptables rules for Gluetun.
 
-## ⚠️ Docker API Security Notice
-
-If you want the new Gluetun container to pick up the iptables changes, you have to restart the Gluetun container. It's a supported feature, but to use it you **must** mount the Docker socket (`/var/run/docker.sock`) into this container.
+## Gluetun compatibility
+If you want the Gluetun container to pick up the iptables changes, you have to restart it. This project can do it for you, but to use it you **must** mount the Docker socket (`/var/run/docker.sock`) into this container.
 > **Warning:** Mounting the Docker socket gives the container full control of your Docker host.  
 > Only use this feature if you trust the container and code!
 
 # Configuration
-
 Configuration is done using environment variables
 
 | Variable | Description | Required | Default |
 | :-: | :-: | :-: | :-: |
 | WINDSCRIBE_USERNAME | username you use to login at windscribe.com/login | YES |  |
 | WINDSCRIBE_PASSWORD | password you use to login at windscribe.com/login | YES |  |
+| FLARESOLVERR_URL | The URL of [FlareSolverr](https://github.com/FlareSolverr/FlareSolverr) to bypass Cloudflare challenge | YES |  | 
 | CLIENT_URL | The URL for the qbittorrent web UI (eg: http://localhost:8080) | YES |  |
 | CLIENT_USERNAME | The username for the qbittorrent web UI | YES |  |
 | CLIENT_PASSWORD | The password for the qbittorrent web UI | YES |  |
@@ -38,14 +51,13 @@ Configuration is done using environment variables
 | QBITTORRENT_CONTAINER_NAME | Name of the qbittorrent Docker container to restart. If set, the app will try to restart the container after updating iptables rules. Both container names are required | NO | |
 
 # Running
-
 ## Using docker (and docker compose in this example)
 
 ```yaml
 version: '3.8'
 services:
   qbittorrent-windscribe-ephemeral-port:
-    image: enumc/qbittorrent-windscribe-ephemeral-port:latest
+    image: andriibarabash/qbittorrent-windscribe-ephemeral-port:latest
     restart: unless-stopped
     volumes:
       - windscribe-cache:/cache
@@ -56,6 +68,7 @@ services:
     environment:
       - WINDSCRIBE_USERNAME=<your windscribe username>
       - WINDSCRIBE_PASSWORD=<your windscribe password>
+      - FLARESOLVERR_URL=http://flaresolverr:8191/v1
       - CLIENT_URL=<url of your qbittorrent Web UI>
       - CLIENT_USERNAME=<username for the qbittorrent Web UI>
       - CLIENT_PASSWORD=<password for the qbittorrent Web UI>
@@ -86,6 +99,7 @@ volumes:
 ```shell
 WINDSCRIBE_USERNAME=<your windscribe username>
 WINDSCRIBE_PASSWORD=<your windscribe password>
+FLARESOLVERR_URL=<url of your FlareSolverr>
 CLIENT_URL=<url of your qbittorrent Web UI>
 CLIENT_USERNAME=<username of your qbittorrent Web UI>
 CLIENT_PASSWORD=<password for the qbittorrent Web UI>

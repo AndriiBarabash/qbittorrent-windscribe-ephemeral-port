@@ -44,6 +44,11 @@ const configTemplate = {
     required: true,
     type: String,
   } as ConfigTemplateRequiredEntry<string>,
+  flaresolverrUrl: {
+    envVariableName: 'FLARESOLVERR_URL',
+    required: true,
+    type: String,
+  } as ConfigTemplateRequiredEntry<string>,
   windscribeRetryDelay: {
     envVariableName: 'WINDSCRIBE_RETRY_DELAY',
     required: false,

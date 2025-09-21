@@ -1,5 +1,5 @@
 import AsyncLock from 'async-lock';
-import {AxiosResponse, default as axios} from 'axios';
+import {default as axios} from 'axios';
 import {Store, default as Keyv} from 'keyv';
 import {Cookie, parse as parseCookie} from 'set-cookie-parser';
 import qs from 'qs';
@@ -31,6 +31,7 @@ export class WindscribeClient {
   constructor(
     private username: string,
     private password: string,
+    private flaresolverrUrl: string,
     cache?: Store<any>,
   ) {
     this.cache = new Keyv({
@@ -109,39 +110,96 @@ export class WindscribeClient {
 
   private async login(): Promise<Cookie> {
     try {
-      // get csrf token and time
-      const {data: csrfData} = await axios.post<{csrf_token: string, csrf_time: number}>('https://res.windscribe.com/res/logintoken', null, {
-        headers: {'User-Agent': userAgent},
-      });
+      // Step 1: Use FlareSolverr to GET /login and solve CF, getting cf_clearance cookie and User-Agent
+      const getPayload = {
+        cmd: 'request.get',
+        url: 'https://windscribe.com/login',
+        maxTimeout: 60000,
+      };
+      const getResponse = await axios.post(this.flaresolverrUrl, getPayload, {headers: {'Content-Type': 'application/json'}});
+      if (getResponse.data.status !== 'ok') {
+        throw new Error(`FlareSolverr failed for GET /login: ${getResponse.data.message}`);
+      }
+      const solution = getResponse.data.solution;
+      const cfCookies = solution.cookies.reduce((acc: string[], c: any) => {
+        if (c.name.startsWith('cf_') || c.name.startsWith('__cf')) acc.push(`${c.name}=${c.value}`);
+        return acc;
+      }, []);
+      const cfUserAgent = solution.userAgent;
 
-      // log in
-      const res = await axios.post('https://windscribe.com/login', qs.stringify({
-        login: '1',
-        upgrade: '0',
-        csrf_time: csrfData.csrf_time,
-        csrf_token: csrfData.csrf_token,
-        username: this.username,
-        password: this.password,
-        code: ''
-      }), {
-        headers: {'content-type': 'application/x-www-form-urlencoded', 'User-Agent': userAgent},
-        maxRedirects: 0,
-        validateStatus: status => status == 302,
-      });
-
-      // extract the cookie
-      return parseCookie(res.headers['set-cookie'], {map: true, decodeValues: true})['ws_session_auth_hash'];
-    } catch (error) {
-      // try to extract windscribe message
-      if (error.response) {
-        const response = error.response as AxiosResponse<string>;
-        const errorMessage = /<div class="content_message error">.*>(.*)<\/div/.exec(response.data);
-        if (response.status == 200 && errorMessage && errorMessage[1]) {
-          throw new Error(`Failed to log into windscribe: ${errorMessage[1]}`);
-        }
+      if (cfCookies.length === 0) {
+        throw new Error('No Cloudflare clearance cookies found in FlareSolverr response');
       }
 
-      // or throw a generic error if windscribe message not found
+      const cfCookieString = cfCookies.join('; ');
+
+      // Step 2: Get CSRF token/time using CF cookies and UA (to associate with the session)
+      let csrfDataObj: { csrf_time: number; csrf_token: string };
+      try {
+        const {data: csrfData} = await axios.post<{ csrf_token: string; csrf_time: number }>('https://res.windscribe.com/res/logintoken', null, {
+          headers: {
+            'User-Agent': cfUserAgent,
+            'Cookie': cfCookieString,
+            'Accept': 'application/json, text/plain, */*',
+            'Referer': 'https://windscribe.com/login',
+            'Origin': 'https://windscribe.com',
+          },
+        });
+        csrfDataObj = {csrf_time: csrfData.csrf_time, csrf_token: csrfData.csrf_token};
+      } catch (csrfError) {
+        throw new Error(`Failed to fetch CSRF with CF bypass: ${csrfError.message}`);
+      }
+
+      // Step 3: Perform actual POST with CF cookies, matching UA, and additional browser-like headers
+      const loginFormData = qs.stringify({
+        login: '1',
+        upgrade: '0',
+        csrf_time: csrfDataObj.csrf_time,
+        csrf_token: csrfDataObj.csrf_token,
+        username: this.username,
+        password: this.password,
+        code: '',
+      });
+      const loginRes = await axios.post('https://windscribe.com/login', loginFormData, {
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+          'User-Agent': cfUserAgent,
+          'Cookie': cfCookieString,
+          'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7',
+          'Accept-Language': 'en-US,en;q=0.9',
+          'Origin': 'https://windscribe.com',
+          'Referer': 'https://windscribe.com/login',
+          'Sec-Fetch-Dest': 'document',
+          'Sec-Fetch-Mode': 'navigate',
+          'Sec-Fetch-Site': 'same-origin',
+          'Upgrade-Insecure-Requests': '1',
+        },
+        maxRedirects: 0,
+        validateStatus: status => [200, 302].includes(status), // Handle 200 error or 302 success
+      });
+
+      if (loginRes.status === 200) {
+        // Check for error in HTML
+        const errorMessage = /<div class="content_message error">.*>(.*)<\/div/.exec(loginRes.data);
+        if (errorMessage && errorMessage[1]) {
+          throw new Error(`Windscribe login error: ${errorMessage[1]}`);
+        }
+        throw new Error('Received 200 but no expected error message; check response');
+      }
+
+      // Extract ws_session_auth_hash from Set-Cookie header
+      const setCookieHeaders = loginRes.headers['set-cookie'];
+      if (!setCookieHeaders) {
+        throw new Error('No Set-Cookie header in login response');
+      }
+      const wsSessionCookie = parseCookie(setCookieHeaders, {map: true, decodeValues: true})['ws_session_auth_hash'];
+      if (!wsSessionCookie) {
+        throw new Error('Failed to find ws_session_auth_hash in Set-Cookie');
+      }
+
+      console.log('Successfully logged in with CF bypass');
+      return wsSessionCookie;
+    } catch (error) {
       throw new Error(`Failed to log into windscribe: ${error.message}`);
     }
   }
