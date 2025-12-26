@@ -10,3 +10,4 @@ dist/
 !.yarn/sdks
 !.yarn/versions
 cache/
+captcha_debug/
