@@ -187,7 +187,7 @@ export class WindscribeClient {
       try {
         const authResponse = await axios.post<AuthTokenResponse>(
           'https://windscribe.com/authtoken/login',
-          qs.stringify({ username: this.username, password: this.password }),
+          qs.stringify({username: this.username, password: this.password}),
           {
             headers: {
               'Content-Type': 'application/x-www-form-urlencoded',
@@ -266,7 +266,7 @@ export class WindscribeClient {
       }
 
       // Step 5: Perform actual POST with all parameters
-      const loginFormData = qs.stringify(loginData, { arrayFormat: 'indices' });
+      const loginFormData = qs.stringify(loginData, {arrayFormat: 'indices'});
       const loginRes = await axios.post('https://windscribe.com/login', loginFormData, {
         headers: {
           'Content-Type': 'application/x-www-form-urlencoded',

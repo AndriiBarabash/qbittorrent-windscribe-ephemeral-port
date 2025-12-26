@@ -37,8 +37,8 @@ function saveDebugLogs(): void {
 
 interface CaptchaData {
   background: string; // base64 encoded PNG
-  slider?: string;    // base64 encoded PNG (puzzle piece) - may not be present
-  top: number;        // vertical position of the piece
+  slider?: string; // base64 encoded PNG (puzzle piece) - may not be present
+  top: number; // vertical position of the piece
 }
 
 interface CaptchaSolution {
@@ -52,12 +52,14 @@ interface CaptchaSolution {
 /**
  * Solves Windscribe's slider CAPTCHA by finding where the puzzle piece fits
  * in the background image using edge-based template matching.
+ * @param {CaptchaData} captchaData - The CAPTCHA data containing background, slider, and top offset
+ * @return {Promise<CaptchaSolution>} The solution containing offset and mouse trail
  */
 export async function solveCaptcha(captchaData: CaptchaData): Promise<CaptchaSolution> {
   // Initialize debug context
   const timestamp = Date.now();
   if (DEBUG_CAPTCHA) {
-    debugContext = { timestamp, logs: [] };
+    debugContext = {timestamp, logs: []};
   }
 
   try {
@@ -80,7 +82,7 @@ export async function solveCaptcha(captchaData: CaptchaData): Promise<CaptchaSol
       if (DEBUG_CAPTCHA) {
         const debugDir = path.join(process.cwd(), 'captcha_debug');
         if (!fs.existsSync(debugDir)) {
-          fs.mkdirSync(debugDir, { recursive: true });
+          fs.mkdirSync(debugDir, {recursive: true});
         }
         fs.writeFileSync(path.join(debugDir, `${timestamp}_background.png`), bgBuffer);
         fs.writeFileSync(path.join(debugDir, `${timestamp}_slider.png`), sliderBuffer);
@@ -106,7 +108,7 @@ export async function solveCaptcha(captchaData: CaptchaData): Promise<CaptchaSol
       debugLog(`Mouse trail length: ${trail.x.length} points`);
     }
 
-    return { offset, trail };
+    return {offset, trail};
   } finally {
     // Always save debug logs at the end
     saveDebugLogs();
@@ -117,6 +119,10 @@ export async function solveCaptcha(captchaData: CaptchaData): Promise<CaptchaSol
 /**
  * Find the horizontal offset where the slider piece fits in the background
  * using multiple detection strategies.
+ * @param {Buffer} bgBuffer - The background image buffer
+ * @param {Buffer} sliderBuffer - The slider piece image buffer
+ * @param {number} topOffset - The vertical position of the target
+ * @return {Promise<number>} The horizontal offset where the piece fits
  */
 async function findSliderOffsetWithTemplate(
   bgBuffer: Buffer,
@@ -133,13 +139,13 @@ async function findSliderOffsetWithTemplate(
   const bgGray = await bgImage
     .greyscale()
     .raw()
-    .toBuffer({ resolveWithObject: true });
+    .toBuffer({resolveWithObject: true});
 
   // Get slider with alpha channel to find the puzzle piece shape
   const sliderRGBA = await sliderImage
     .ensureAlpha()
     .raw()
-    .toBuffer({ resolveWithObject: true });
+    .toBuffer({resolveWithObject: true});
 
   const bgWidth = bgMeta.width!;
   const bgHeight = bgMeta.height!;
@@ -170,6 +176,14 @@ async function findSliderOffsetWithTemplate(
  *
  * Strategy: Find the left edge of the white rectangular outline by looking for
  * vertical lines of bright pixels, then verify by checking for a complete rectangle.
+ * @param {Buffer} bgPixels - The background image pixel data
+ * @param {number} bgWidth - Background image width
+ * @param {number} bgHeight - Background image height
+ * @param {Buffer} sliderRGBA - The slider piece RGBA pixel data
+ * @param {number} sliderWidth - Slider image width
+ * @param {number} sliderHeight - Slider image height
+ * @param {number} topOffset - The vertical position of the target
+ * @return {number} The horizontal offset where the piece fits
  */
 function findTargetOutline(
   bgPixels: Buffer,
@@ -181,7 +195,7 @@ function findTargetOutline(
   topOffset: number
 ): number {
   // First pass: find the bounding box of the puzzle piece using alpha channel
-  let minX = sliderWidth, maxX = 0, minY = sliderHeight, maxY = 0;
+  let minX = sliderWidth; let maxX = 0; let minY = sliderHeight; let maxY = 0;
 
   for (let y = 0; y < sliderHeight; y++) {
     for (let x = 0; x < sliderWidth; x++) {
@@ -241,7 +255,7 @@ function findTargetOutline(
     }
 
     // Score based on how many bright pixels in this column (vertical line detection)
-    columnScores.push({ x, score: totalBrightness, brightPixels: brightPixelCount });
+    columnScores.push({x, score: totalBrightness, brightPixels: brightPixelCount});
   }
 
   // Find columns with significant bright pixel counts (potential vertical edges)
@@ -261,7 +275,7 @@ function findTargetOutline(
   const sortedByX = [...significantColumns].sort((a, b) => a.x - b.x);
 
   if (DEBUG_CAPTCHA) {
-    debugLog(`Columns sorted by X position: ${JSON.stringify(sortedByX.slice(0, 10).map(c => ({ x: c.x, bright: c.brightPixels })))}`);
+    debugLog(`Columns sorted by X position: ${JSON.stringify(sortedByX.slice(0, 10).map(c => ({x: c.x, bright: c.brightPixels})))}`);
   }
 
   // Look for pairs of edges that are approximately pieceWidth apart
@@ -280,7 +294,7 @@ function findTargetOutline(
       if (Math.abs(distance - expectedDistance) < tolerance) {
         // Good candidate pair
         const pairScore = leftEdge.brightPixels + rightEdge.brightPixels;
-        edgePairs.push({ left: leftEdge.x, right: rightEdge.x, score: pairScore });
+        edgePairs.push({left: leftEdge.x, right: rightEdge.x, score: pairScore});
       }
     }
   }
@@ -293,13 +307,11 @@ function findTargetOutline(
   }
 
   let bestLeftEdge = Math.floor(bgWidth * 0.5);
-  let bestScore = 0;
 
   if (edgePairs.length > 0) {
     // Pick the pair with highest combined score
     const bestPair = edgePairs.sort((a, b) => b.score - a.score)[0];
     bestLeftEdge = bestPair.left;
-    bestScore = bestPair.score;
 
     if (DEBUG_CAPTCHA) {
       debugLog(`Best edge pair: left=${bestPair.left}, right=${bestPair.right}, score=${bestPair.score}`);
@@ -308,7 +320,6 @@ function findTargetOutline(
     // Fallback: use the leftmost significant column
     if (sortedByX.length > 0) {
       bestLeftEdge = sortedByX[0].x;
-      bestScore = sortedByX[0].brightPixels;
 
       if (DEBUG_CAPTCHA) {
         debugLog(`No pairs found, using leftmost significant column: x=${bestLeftEdge}`);
@@ -359,6 +370,9 @@ function findTargetOutline(
  * Find the cutout/shadow position in the background image.
  * This is used when there's no separate slider image - we look for
  * a darker rectangular region (the shadow) or sharp edge discontinuity.
+ * @param {Buffer} bgBuffer - The background image buffer
+ * @param {number} topOffset - The vertical position hint
+ * @return {Promise<number>} The horizontal position of the cutout
  */
 async function findCutoutPosition(
   bgBuffer: Buffer,
@@ -370,10 +384,10 @@ async function findCutoutPosition(
   const height = bgMeta.height!;
 
   // Get raw RGBA pixel data
-  const { data } = await bgImage
+  const {data} = await bgImage
     .ensureAlpha()
     .raw()
-    .toBuffer({ resolveWithObject: true });
+    .toBuffer({resolveWithObject: true});
 
   // Look for areas with strong vertical edges (the cutout boundaries)
   // We search in a horizontal band around the topOffset position
@@ -428,110 +442,12 @@ async function findCutoutPosition(
 }
 
 /**
- * Simple Sobel edge detection
- */
-function sobelEdgeDetection(
-  pixels: Buffer,
-  width: number,
-  height: number
-): Float32Array {
-  const edges = new Float32Array(width * height);
-
-  // Sobel kernels
-  const sobelX = [-1, 0, 1, -2, 0, 2, -1, 0, 1];
-  const sobelY = [-1, -2, -1, 0, 0, 0, 1, 2, 1];
-
-  for (let y = 1; y < height - 1; y++) {
-    for (let x = 1; x < width - 1; x++) {
-      let gx = 0;
-      let gy = 0;
-
-      // Apply 3x3 kernel
-      for (let ky = -1; ky <= 1; ky++) {
-        for (let kx = -1; kx <= 1; kx++) {
-          const idx = (y + ky) * width + (x + kx);
-          const kernelIdx = (ky + 1) * 3 + (kx + 1);
-          const pixel = pixels[idx];
-          gx += pixel * sobelX[kernelIdx];
-          gy += pixel * sobelY[kernelIdx];
-        }
-      }
-
-      // Gradient magnitude
-      edges[y * width + x] = Math.sqrt(gx * gx + gy * gy);
-    }
-  }
-
-  return edges;
-}
-
-/**
- * Template matching using normalized cross-correlation on edge images.
- * Searches for the best horizontal position where the slider matches the background.
- */
-function templateMatch(
-  bgEdges: Float32Array,
-  bgWidth: number,
-  bgHeight: number,
-  sliderEdges: Float32Array,
-  sliderWidth: number,
-  sliderHeight: number,
-  topOffset: number
-): number {
-  let bestOffset = 0;
-  let bestScore = -Infinity;
-
-  // Only search right side of the image (piece won't be at the start)
-  // Start from a reasonable offset (e.g., 40 pixels in) to avoid false matches at left edge
-  const startX = 40;
-  const endX = bgWidth - sliderWidth;
-
-  for (let x = startX; x < endX; x++) {
-    let score = 0;
-    let templateSum = 0;
-    let bgSum = 0;
-
-    // Compare slider edges with background at this position
-    for (let sy = 0; sy < sliderHeight; sy++) {
-      for (let sx = 0; sx < sliderWidth; sx++) {
-        const sliderIdx = sy * sliderWidth + sx;
-        const bgIdx = (topOffset + sy) * bgWidth + (x + sx);
-
-        if (bgIdx >= 0 && bgIdx < bgEdges.length) {
-          const sliderVal = sliderEdges[sliderIdx];
-          const bgVal = bgEdges[bgIdx];
-
-          // For edge matching, look for areas where slider has edges
-          // and background has matching edge patterns (the cutout)
-          if (sliderVal > 30) { // Only consider significant edges
-            score += sliderVal * bgVal;
-            templateSum += sliderVal * sliderVal;
-            bgSum += bgVal * bgVal;
-          }
-        }
-      }
-    }
-
-    // Normalized score
-    const normalizer = Math.sqrt(templateSum * bgSum);
-    if (normalizer > 0) {
-      score /= normalizer;
-    }
-
-    if (score > bestScore) {
-      bestScore = score;
-      bestOffset = x;
-    }
-  }
-
-  return bestOffset;
-}
-
-/**
  * Generate a human-like mouse trail from 0 to the target offset.
  * Simulates natural mouse movement with slight variations.
+ * @param {number} targetOffset - The target horizontal offset
+ * @return {{x: number[], y: number[]}} Arrays of x and y coordinates
  */
-function generateMouseTrail(targetOffset: number): { x: number[]; y: number[] } {
+function generateMouseTrail(targetOffset: number): {x: number[]; y: number[]} {
   const x: number[] = [];
   const y: number[] = [];
 
@@ -541,9 +457,6 @@ function generateMouseTrail(targetOffset: number): { x: number[]; y: number[] } 
   // Start position
   let currentX = 0;
   let currentY = 0;
-
-  // Human-like movement parameters
-  const avgSpeed = targetOffset / numPoints;
 
   for (let i = 0; i < numPoints; i++) {
     // Progress from 0 to 1
@@ -570,5 +483,5 @@ function generateMouseTrail(targetOffset: number): { x: number[]; y: number[] } 
   x[x.length - 1] = targetOffset;
   y[y.length - 1] = 0;
 
-  return { x, y };
+  return {x, y};
 }
