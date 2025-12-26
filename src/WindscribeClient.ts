@@ -3,11 +3,35 @@ import {default as axios} from 'axios';
 import {Store, default as Keyv} from 'keyv';
 import {Cookie, parse as parseCookie} from 'set-cookie-parser';
 import qs from 'qs';
+import crypto from 'crypto';
+import {solveCaptcha} from './CaptchaSolver.js';
 
 
 const lock = new AsyncLock();
 
 const userAgent = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/104.0.0.0 Safari/537.36';
+
+// Secret key used for signing the auth token (from Windscribe's login JS)
+const AUTH_TOKEN_SECRET = 'my_mom_told_me_this_is_peak_engineering';
+
+// Helper functions for generating login parameters
+function generateNonce(): string {
+  return Math.random().toString(36).substring(2, 15);
+}
+
+function generateSessionId(): string {
+  return crypto.randomBytes(16).toString('hex');
+}
+
+function generateRequestId(): string {
+  const random = crypto.randomBytes(16);
+  const hash = crypto.createHash('sha256').update(random).digest();
+  return hash.slice(0, 16).toString('base64').replace(/[^a-zA-Z0-9]/g, '').substring(0, 24);
+}
+
+function computeTokenSignature(token: string): string {
+  return crypto.createHash('sha256').update(token + AUTH_TOKEN_SECRET).digest('hex');
+}
 
 interface CsrfInfo {
   csrfTime: number;
@@ -130,33 +154,119 @@ export class WindscribeClient {
         .join('; ');
       const cfUserAgent = flareResponse.data.solution.userAgent;
 
-      // Step 2: Get CSRF token/time using CF cookies and UA (to associate with the session)
-      let csrfData: { csrf_time: number; csrf_token: string };
-      try {
-        const csrfResponse = await axios.post<typeof csrfData>('https://res.windscribe.com/res/logintoken', null, {
-          headers: {
-            'User-Agent': cfUserAgent,
-            'Cookie': cfCookies,
-            'Accept': 'application/json, text/plain, */*',
-            'Referer': 'https://windscribe.com/login',
-            'Origin': 'https://windscribe.com',
-          },
-        });
-        csrfData = csrfResponse.data;
-      } catch (err) {
-        throw new Error(`Failed to fetch CSRF: ${err.message}`);
+      // Step 2: Get auth token from /authtoken/login endpoint
+      interface CaptchaChallenge {
+        background: string;
+        slider?: string;
+        top: number;
+        type: string;
       }
 
-      // Step 3: Perform actual POST with CF cookies, matching UA, and additional browser-like headers
-      const loginFormData = qs.stringify({
+      interface AuthTokenResponse {
+        errorCode?: number;
+        errorMessage?: string;
+        data?: {
+          token: string;
+          token_id?: string;
+          captcha?: CaptchaChallenge;
+          access_level?: number;
+          signature?: string;
+          algorithm?: string;
+          version?: string;
+          request_id?: string;
+          entropy?: {
+            e: string;
+            s: string;
+          };
+        };
+      }
+
+      let authToken: string;
+      let captchaSolution: { offset: number; trail: { x: number[]; y: number[] } } | null = null;
+
+      try {
+        const authResponse = await axios.post<AuthTokenResponse>(
+          'https://windscribe.com/authtoken/login',
+          qs.stringify({username: this.username, password: this.password}),
+          {
+            headers: {
+              'Content-Type': 'application/x-www-form-urlencoded',
+              'User-Agent': cfUserAgent,
+              'Cookie': cfCookies,
+              'Accept': 'application/json, text/plain, */*',
+              'Referer': 'https://windscribe.com/login',
+              'Origin': 'https://windscribe.com',
+            },
+          }
+        );
+
+        if (authResponse.data.errorCode) {
+          throw new Error(`Auth token error (${authResponse.data.errorCode}): ${authResponse.data.errorMessage}`);
+        }
+
+        if (!authResponse.data.data?.token) {
+          throw new Error('No token in auth response');
+        }
+
+        // Check if CAPTCHA is required (captcha data present means we need to solve it)
+        if (authResponse.data.data.captcha?.background) {
+          console.log('CAPTCHA challenge received, attempting to solve...');
+          console.log('CAPTCHA data keys:', Object.keys(authResponse.data.data.captcha));
+
+          const captchaData = authResponse.data.data.captcha;
+
+          // Solve the CAPTCHA using image processing
+          captchaSolution = await solveCaptcha({
+            background: captchaData.background,
+            slider: captchaData.slider,
+            top: captchaData.top,
+          });
+
+          console.log(`CAPTCHA solved: offset=${captchaSolution.offset}`);
+        }
+
+        authToken = authResponse.data.data.token;
+        console.log('Successfully obtained auth token' + (captchaSolution ? ' (with CAPTCHA)' : ''));
+      } catch (err) {
+        if (err.message.includes('Auth token error') || err.message.includes('CAPTCHA')) {
+          throw err;
+        }
+        throw new Error(`Failed to fetch auth token: ${err.message}`);
+      }
+
+      // Step 3: Compute signature and generate login parameters
+      const secureTokenSig = computeTokenSignature(authToken);
+      const timestamp = Date.now();
+      const nonce = generateNonce();
+      const sessionId = generateSessionId();
+      const requestId = generateRequestId();
+
+      // Step 4: Build login form data
+      const loginData: Record<string, any> = {
         login: '1',
-        upgrade: '0',
-        csrf_time: csrfData.csrf_time,
-        csrf_token: csrfData.csrf_token,
         username: this.username,
         password: this.password,
-        code: '',
-      });
+        secure_token: authToken,
+        secure_token_sig: secureTokenSig,
+        timestamp: timestamp,
+        nonce: nonce,
+        client_version: '1.0.0',
+        session_id: sessionId,
+        request_id: requestId,
+        upgrade: '0',
+      };
+
+      // Add CAPTCHA solution if required
+      if (captchaSolution) {
+        loginData.captcha_solution = captchaSolution.offset;
+        loginData.captcha_trail = {
+          x: captchaSolution.trail.x,
+          y: captchaSolution.trail.y,
+        };
+      }
+
+      // Step 5: Perform actual POST with all parameters
+      const loginFormData = qs.stringify(loginData, {arrayFormat: 'indices'});
       const loginRes = await axios.post('https://windscribe.com/login', loginFormData, {
         headers: {
           'Content-Type': 'application/x-www-form-urlencoded',
@@ -247,7 +357,10 @@ export class WindscribeClient {
 
       // extract data from page
       const epfExpires = res.data.match(/epfExpires = (\d+);/)[1]; // this is always present. set to 0 if no port is active
-      const ports = [...res.data.matchAll(/<span>(?<port>\d+)<\/span>/g)].map(x => +x[1]); // this will return an empty array when there are not pots forwarded
+      // Extract ports from the new UI structure: <span class="pf-ext">10583</span> and <span class="pf-int">10011</span>
+      const extPort = res.data.match(/<span class="pf-ext">(\d+)<\/span>/)?.[1];
+      const intPort = res.data.match(/<span class="pf-int">(\d+)<\/span>/)?.[1];
+      const ports = [extPort, intPort].filter((p): p is string => p !== undefined).map(p => +p);
 
       return {
         epfExpires: +epfExpires,
