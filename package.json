@@ -39,6 +39,7 @@
     "keyv": "^4.5.0",
     "keyv-file": "^0.2.0",
     "node-cron": "^3.0.2",
+    "otpauth": "^9.4.1",
     "qs": "^6.11.0",
     "set-cookie-parser": "^2.5.1",
     "sharp": "^0.34.5"

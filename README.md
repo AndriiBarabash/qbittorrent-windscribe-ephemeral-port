@@ -36,6 +36,7 @@ Configuration is done using environment variables
 | :-: | :-: | :-: | :-: |
 | WINDSCRIBE_USERNAME | username you use to login at windscribe.com/login | YES |  |
 | WINDSCRIBE_PASSWORD | password you use to login at windscribe.com/login | YES |  |
+| WINDSCRIBE_TOTP_SECRET | TOTP secret for 2FA authentication (Base32 encoded). Required if 2FA is enabled on your Windscribe account. See [2FA Setup](#2fa-setup) | NO |  |
 | FLARESOLVERR_URL | The URL of [FlareSolverr](https://github.com/FlareSolverr/FlareSolverr) to bypass Cloudflare challenge | YES |  | 
 | CLIENT_URL | The URL for the qbittorrent web UI (eg: http://localhost:8080) | YES |  |
 | CLIENT_USERNAME | The username for the qbittorrent web UI | YES |  |
@@ -49,6 +50,18 @@ Configuration is done using environment variables
 | GLUETUN_IFACE | Gluetun vpn interface name | NO | `tun0` |
 | GLUETUN_CONTAINER_NAME | Name of the Gluetun Docker container to restart. If set, the app will try to restart the container after updating iptables rules. Both container names are required | NO | |
 | QBITTORRENT_CONTAINER_NAME | Name of the qbittorrent Docker container to restart. If set, the app will try to restart the container after updating iptables rules. Both container names are required | NO | |
+
+## 2FA Setup
+
+If you have Two-Factor Authentication (2FA) enabled on your Windscribe account, you need to provide the TOTP secret so this application can generate authentication codes automatically.
+
+When you set up 2FA in Windscribe, you're shown a QR code. This QR code contains a URI like:
+```
+otpauth://totp/Windscribe:yourusername?secret=ABCDEFGHIJKLMNOP&issuer=Windscribe
+```
+
+You need to extract the `secret=XXX` value from this URI. Some authenticator apps allow you to view the secret. Or you can decode the QR code.  
+The secret is a Base32-encoded string (uppercase letters A-Z and digits 2-7). Set it as `WINDSCRIBE_TOTP_SECRET` in your configuration.
 
 # Running
 ## Using docker (and docker compose in this example)
@@ -75,6 +88,7 @@ services:
 
       # optional
       # - CLIENT_RETRY_DELAY=300000
+      # - WINDSCRIBE_TOTP_SECRET=<your TOTP secret if 2FA is enabled>
       # - WINDSCRIBE_RETRY_DELAY=3600000
       # - WINDSCRIBE_EXTRA_DELAY=60000
       # - CRON_SCHEDULE=
@@ -105,7 +119,7 @@ CLIENT_USERNAME=<username of your qbittorrent Web UI>
 CLIENT_PASSWORD=<password for the qbittorrent Web UI>
 
 # optional
-# CLIENT_HOST_ID=
+# WINDSCRIBE_TOTP_SECRET=<your TOTP secret if 2FA is enabled>
 # WINDSCRIBE_RETRY_DELAY=3600000
 # WINDSCRIBE_EXTRA_DELAY=60000
 # CRON_SCHEDULE=

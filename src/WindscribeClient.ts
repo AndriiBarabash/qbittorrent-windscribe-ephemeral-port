@@ -1,9 +1,10 @@
 import AsyncLock from 'async-lock';
 import {default as axios} from 'axios';
-import {Store, default as Keyv} from 'keyv';
+import {default as Keyv, Store} from 'keyv';
 import {Cookie, parse as parseCookie} from 'set-cookie-parser';
 import qs from 'qs';
 import crypto from 'crypto';
+import * as OTPAuth from 'otpauth';
 import {solveCaptcha} from './CaptchaSolver.js';
 
 
@@ -51,17 +52,31 @@ export interface WindscribePort {
 export class WindscribeClient {
 
   private cache: Keyv<string>;
+  private readonly totp: OTPAuth.TOTP | null = null;
 
   constructor(
     private username: string,
     private password: string,
     private flaresolverrUrl: string,
     cache?: Store<any>,
+    totpSecret?: string,
   ) {
     this.cache = new Keyv({
       store: cache,
       namespace: 'windscribe',
     });
+
+    if (totpSecret) {
+      this.totp = new OTPAuth.TOTP({
+        issuer: 'Windscribe',
+        label: username,
+        algorithm: 'SHA1',
+        digits: 6,
+        period: 30,
+        secret: totpSecret,
+      });
+      console.log('2FA TOTP configured for Windscribe login');
+    }
   }
 
   async updatePort(): Promise<WindscribePort> {
@@ -256,6 +271,12 @@ export class WindscribeClient {
         upgrade: '0',
       };
 
+      // Add 2FA code if TOTP is configured
+      if (this.totp) {
+        loginData.code = this.totp.generate();
+        console.log('Generated 2FA TOTP code for login');
+      }
+
       // Add CAPTCHA solution if required
       if (captchaSolution) {
         loginData.captcha_solution = captchaSolution.offset;
@@ -286,10 +307,14 @@ export class WindscribeClient {
       });
 
       if (loginRes.status === 200) {
-        // Check for error in HTML
-        const errorMessage = /<div class="content_message error">.*>(.*)<\/div/.exec(loginRes.data);
-        if (errorMessage && errorMessage[1]) {
-          throw new Error(`Windscribe login error: ${errorMessage[1]}`);
+        // Check for error in HTML: <div class="content_message error"><i></i>Error text</div> or <div class="content_message error">Error text</div>
+        const errorMatch = /<div class="content_message error">(?:<i><\/i>)?([^<]+)<\/div>/.exec(loginRes.data);
+        if (errorMatch && errorMatch[1]) {
+          const errorText = errorMatch[1].trim();
+          if (errorText.toLowerCase().includes('2fa')) {
+            throw new Error(`Windscribe 2FA required: ${errorText}. Set WINDSCRIBE_TOTP_SECRET environment variable.`);
+          }
+          throw new Error(`Windscribe login error: ${errorText}`);
         }
         throw new Error('Received 200 but no expected error message; check response');
       }

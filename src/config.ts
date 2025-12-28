@@ -44,6 +44,11 @@ const configTemplate = {
     required: true,
     type: String,
   } as ConfigTemplateRequiredEntry<string>,
+  windscribeTotpSecret: {
+    envVariableName: 'WINDSCRIBE_TOTP_SECRET',
+    required: false,
+    type: String,
+  } as ConfigTemplateOptionalEntry<string>,
   flaresolverrUrl: {
     envVariableName: 'FLARESOLVERR_URL',
     required: true,
