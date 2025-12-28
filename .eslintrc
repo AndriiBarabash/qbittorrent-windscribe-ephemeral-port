@@ -21,6 +21,7 @@
     "indent": ["error", 2],
     "padded-blocks": ["warn", { "classes": "always", "switches": "never", "blocks": "never" }],
     "linebreak-style": "off",
-    "arrow-parens": ["warn", "as-needed"]
+    "arrow-parens": ["warn", "as-needed"],
+    "operator-linebreak": ["error", "before"]
   }
 }
