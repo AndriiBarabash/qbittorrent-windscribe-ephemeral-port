@@ -28,7 +28,7 @@ const client = new QBittorrentClient(config.clientUrl, config.clientUsername, co
 // init schedule if configured
 const scheduledTask = !config.cronSchedule
   ? null
-  : schedule(config.cronSchedule, () => run('schedule'), {scheduled: false});
+  : schedule(config.cronSchedule, () => run('schedule'));
 
 async function update() {
   let nextRetry: Date = null;
@@ -87,13 +87,13 @@ async function update() {
             });
         }
 
-        console.log('torrent port updated');
+        console.log('Torrent port updated');
       }
     } else {
       console.log(`Windscribe port is unknown, current torrent port is ${currentPort}`);
     }
   } catch (error) {
-    console.error('torrent update failed', error);
+    console.error('Torrent update failed', error);
 
     // if failed, retry after some delay
     const clientRetryDelay = config.clientRetryDelay || (5 * 60 * 1000);
@@ -108,7 +108,7 @@ async function update() {
 
 let timeoutId: NodeJS.Timeout; // next run/retry timer
 async function run(trigger: string) {
-  console.log(`starting update, trigger type: ${trigger}`);
+  console.log(`Starting update, trigger type: ${trigger}`);
 
   // clear any previous timeouts (relevant when triggered by schedule)
   clearTimeout(timeoutId);

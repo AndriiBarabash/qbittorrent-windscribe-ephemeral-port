@@ -1,6 +1,6 @@
 import AsyncLock from 'async-lock';
 import {default as axios} from 'axios';
-import {default as Keyv, Store} from 'keyv';
+import Keyv, {type KeyvStoreAdapter} from 'keyv';
 import {Cookie, parse as parseCookie} from 'set-cookie-parser';
 import qs from 'qs';
 import crypto from 'crypto';
@@ -58,7 +58,7 @@ export class WindscribeClient {
     private username: string,
     private password: string,
     private flaresolverrUrl: string,
-    cache?: Store<any>,
+    cache?: KeyvStoreAdapter,
     totpSecret?: string,
   ) {
     this.cache = new Keyv({
@@ -257,7 +257,7 @@ export class WindscribeClient {
       const requestId = generateRequestId();
 
       // Step 4: Build login form data
-      const loginData: Record<string, any> = {
+      const loginData: Record<string, unknown> = {
         login: '1',
         username: this.username,
         password: this.password,
@@ -458,7 +458,7 @@ export class WindscribeClient {
         ports: [epf.ext, epf.int],
       };
     } catch (error) {
-      throw new Error;
+      throw new Error(`Failed to request matching ephemeral port: ${error instanceof Error ? error.message : error}`);
     }
   }
 
