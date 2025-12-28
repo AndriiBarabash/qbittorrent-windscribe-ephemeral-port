@@ -317,12 +317,33 @@ function findTargetOutline(
       debugLog(`Best edge pair: left=${bestPair.left}, right=${bestPair.right}, score=${bestPair.score}`);
     }
   } else {
-    // Fallback: use the leftmost significant column
+    // Fallback: no edge pairs found, need to determine if we found left or right edge
     if (sortedByX.length > 0) {
-      bestLeftEdge = sortedByX[0].x;
+      const detectedX = sortedByX[0].x;
+      const searchMidpoint = (searchStartX + searchEndX) / 2;
 
-      if (DEBUG_CAPTCHA) {
-        debugLog(`No pairs found, using leftmost significant column: x=${bestLeftEdge}`);
+      // Check if detected columns form a tight cluster (single edge)
+      const clusterSpread = sortedByX.length > 1
+        ? sortedByX[sortedByX.length - 1].x - sortedByX[0].x
+        : 0;
+      const isSingleEdgeCluster = clusterSpread < pieceWidth * 0.3;
+
+      if (isSingleEdgeCluster && detectedX > searchMidpoint) {
+        // Detected edge is in the right portion of search area - likely the RIGHT edge
+        // Estimate left edge by subtracting piece width
+        bestLeftEdge = detectedX - pieceWidth;
+
+        if (DEBUG_CAPTCHA) {
+          debugLog(`No pairs found, detected cluster at x=${detectedX} appears to be RIGHT edge`);
+          debugLog(`Estimating left edge: ${detectedX} - ${pieceWidth} = ${bestLeftEdge}`);
+        }
+      } else {
+        // Detected edge is in the left/middle portion - assume it's the LEFT edge
+        bestLeftEdge = detectedX;
+
+        if (DEBUG_CAPTCHA) {
+          debugLog(`No pairs found, using detected column as left edge: x=${bestLeftEdge}`);
+        }
       }
     }
   }

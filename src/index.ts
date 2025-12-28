@@ -26,8 +26,9 @@ const windscribe = new WindscribeClient(config.windscribeUsername, config.windsc
 const client = new QBittorrentClient(config.clientUrl, config.clientUsername, config.clientPassword);
 
 // init schedule if configured
-const scheduledTask = !config.cronSchedule ? null :
-  schedule(config.cronSchedule, () => run('schedule'), {scheduled: false});
+const scheduledTask = !config.cronSchedule
+  ? null
+  : schedule(config.cronSchedule, () => run('schedule'), {scheduled: false});
 
 async function update() {
   let nextRetry: Date = null;
