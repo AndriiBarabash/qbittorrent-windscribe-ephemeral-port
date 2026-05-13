@@ -15,6 +15,21 @@
     rfc4648 "^1.5.4"
     uint8array-extras "^1.5.0"
 
+"@ctrl/qbittorrent@^9.11.0":
+  version "9.11.0"
+  resolved "https://registry.yarnpkg.com/@ctrl/qbittorrent/-/qbittorrent-9.11.0.tgz#a61020d4fd32df8e3e906972e1d63f8f74ad9866"
+  integrity sha512-mltiPLncdpAHrRbd2H8uy9nTgFhk0urcmkHxCDHcJehRvgd6ta2qnhQ2aO0KI8lgNDvHfmiNh4FAx0yoPBz8Xg==
+  dependencies:
+    "@ctrl/magnet-link" "^4.2.0"
+    "@ctrl/shared-torrent" "^6.5.0"
+    "@ctrl/torrent-file" "^4.4.0"
+    cookie "^1.0.2"
+    node-fetch-native "^1.6.7"
+    ofetch "^1.5.1"
+    type-fest "^5.2.0"
+    ufo "^1.6.1"
+    uint8array-extras "^1.5.0"
+
 "@ctrl/shared-torrent@^6.5.0":
   version "6.5.0"
   resolved "https://registry.yarnpkg.com/@ctrl/shared-torrent/-/shared-torrent-6.5.0.tgz#34d58e02ba1add904b905e6789443e767d2cafc4"
