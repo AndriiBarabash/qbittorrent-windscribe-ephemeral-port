@@ -20,14 +20,19 @@ const configTemplate = {
   } as ConfigTemplateRequiredEntry<string>,
   clientUsername: {
     envVariableName: 'CLIENT_USERNAME',
-    required: true,
+    required: false,
     type: String,
-  } as ConfigTemplateRequiredEntry<string>,
+  } as ConfigTemplateOptionalEntry<string>,
   clientPassword: {
     envVariableName: 'CLIENT_PASSWORD',
-    required: true,
+    required: false,
     type: String,
-  } as ConfigTemplateRequiredEntry<string>,
+  } as ConfigTemplateOptionalEntry<string>,
+  clientApiKey: {
+    envVariableName: 'CLIENT_API_KEY',
+    required: false,
+    type: String,
+  } as ConfigTemplateOptionalEntry<string>,
   clientRetryDelay: {
     envVariableName: 'CLIENT_RETRY_DELAY',
     required: false,
@@ -139,5 +144,11 @@ export function getConfig(): Config {
     return [name, value ? value : null];
   });
 
-  return Object.fromEntries(entries);
+  const config = Object.fromEntries(entries);
+
+  if (!config.clientApiKey && !(config.clientUsername && config.clientPassword)) {
+    throw new Error('Either CLIENT_API_KEY or both CLIENT_USERNAME and CLIENT_PASSWORD must be provided');
+  }
+
+  return config;
 }

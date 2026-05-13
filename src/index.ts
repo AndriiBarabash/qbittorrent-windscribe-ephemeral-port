@@ -23,7 +23,7 @@ const cache = !config.cacheDir ? undefined : new KeyvFile({
 const windscribe = new WindscribeClient(config.windscribeUsername, config.windscribePassword, config.flaresolverrUrl, cache, config.windscribeTotpSecret);
 
 // init torrent client
-const client = new QBittorrentClient(config.clientUrl, config.clientUsername, config.clientPassword);
+const client = new QBittorrentClient(config.clientUrl, config.clientUsername, config.clientPassword, config.clientApiKey);
 
 // init schedule if configured
 const scheduledTask = !config.cronSchedule

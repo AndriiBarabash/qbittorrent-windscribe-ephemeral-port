@@ -39,8 +39,9 @@ Configuration is done using environment variables
 | WINDSCRIBE_TOTP_SECRET | TOTP secret for 2FA authentication (Base32 encoded). Required if 2FA is enabled on your Windscribe account. See [2FA Setup](#2fa-setup) | NO |  |
 | FLARESOLVERR_URL | The URL of [FlareSolverr](https://github.com/FlareSolverr/FlareSolverr) to bypass Cloudflare challenge | YES |  | 
 | CLIENT_URL | The URL for the qbittorrent web UI (eg: http://localhost:8080) | YES |  |
-| CLIENT_USERNAME | The username for the qbittorrent web UI | YES |  |
-| CLIENT_PASSWORD | The password for the qbittorrent web UI | YES |  |
+| CLIENT_API_KEY | API key for the qbittorrent web UI (requires qBittorrent ≥5.2). Generate it in WebUI Preferences → WebUI → API Key. Either this or `CLIENT_USERNAME` + `CLIENT_PASSWORD` must be set | NO |  |
+| CLIENT_USERNAME | The username for the qbittorrent web UI. Required when `CLIENT_API_KEY` is not set | NO |  |
+| CLIENT_PASSWORD | The password for the qbittorrent web UI. Required when `CLIENT_API_KEY` is not set | NO |  |
 | CRON_SCHEDULE | An extra cron schedule used to periodically validate and update the port if needed. Disabled if left empty | NO |  |
 | WINDSCRIBE_RETRY_DELAY | how long to wait (in milliseconds) before retrying after a windscribe error. For example a failed login. | NO | 3600000 (1 hour) |
 | WINDSCRIBE_EXTRA_DELAY | how long to wait (in milliseconds) after the ephemeral port expires before trying to create a new one. | NO | 60000 (1 minute) |
@@ -83,8 +84,11 @@ services:
       - WINDSCRIBE_PASSWORD=<your windscribe password>
       - FLARESOLVERR_URL=http://flaresolverr:8191/v1
       - CLIENT_URL=<url of your qbittorrent Web UI>
-      - CLIENT_USERNAME=<username for the qbittorrent Web UI>
-      - CLIENT_PASSWORD=<password for the qbittorrent Web UI>
+      # use API key (qBittorrent ≥5.2, recommended)
+      - CLIENT_API_KEY=<API key from WebUI Preferences → WebUI → API Key>
+      # or username/password (all qBittorrent versions)
+      # - CLIENT_USERNAME=<username for the qbittorrent Web UI>
+      # - CLIENT_PASSWORD=<password for the qbittorrent Web UI>
 
       # optional
       # - CLIENT_RETRY_DELAY=300000
@@ -115,8 +119,11 @@ WINDSCRIBE_USERNAME=<your windscribe username>
 WINDSCRIBE_PASSWORD=<your windscribe password>
 FLARESOLVERR_URL=<url of your FlareSolverr>
 CLIENT_URL=<url of your qbittorrent Web UI>
-CLIENT_USERNAME=<username of your qbittorrent Web UI>
-CLIENT_PASSWORD=<password for the qbittorrent Web UI>
+# use API key (qBittorrent ≥5.2, recommended)
+CLIENT_API_KEY=<API key from WebUI Preferences → WebUI → API Key>
+# or username/password (all qBittorrent versions)
+# CLIENT_USERNAME=<username of your qbittorrent Web UI>
+# CLIENT_PASSWORD=<password for the qbittorrent Web UI>
 
 # optional
 # WINDSCRIBE_TOTP_SECRET=<your TOTP secret if 2FA is enabled>
