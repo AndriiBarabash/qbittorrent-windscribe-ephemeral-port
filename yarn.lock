@@ -15,19 +15,19 @@
     rfc4648 "^1.5.4"
     uint8array-extras "^1.5.0"
 
-"@ctrl/qbittorrent@^9.11.0":
-  version "9.11.0"
-  resolved "https://registry.yarnpkg.com/@ctrl/qbittorrent/-/qbittorrent-9.11.0.tgz#a61020d4fd32df8e3e906972e1d63f8f74ad9866"
-  integrity sha512-mltiPLncdpAHrRbd2H8uy9nTgFhk0urcmkHxCDHcJehRvgd6ta2qnhQ2aO0KI8lgNDvHfmiNh4FAx0yoPBz8Xg==
+"@ctrl/qbittorrent@^9.12.1":
+  version "9.12.1"
+  resolved "https://registry.yarnpkg.com/@ctrl/qbittorrent/-/qbittorrent-9.12.1.tgz"
+  integrity sha512-6rSTWPV0UwehqLCyBLh9Avw5FPA1nh8SO+aTxrEXu6okZPjz+3tn7EGZdLhOfy+6poIc7miX/1g1VAOVo3JSTA==
   dependencies:
-    "@ctrl/magnet-link" "^4.2.0"
-    "@ctrl/shared-torrent" "^6.5.0"
-    "@ctrl/torrent-file" "^4.4.0"
-    cookie "^1.0.2"
+    "@ctrl/magnet-link" "^4.3.0"
+    "@ctrl/shared-torrent" "^6.5.1"
+    "@ctrl/torrent-file" "^4.5.0"
+    cookie "^1.1.1"
     node-fetch-native "^1.6.7"
     ofetch "^1.5.1"
-    type-fest "^5.2.0"
-    ufo "^1.6.1"
+    type-fest "^5.6.0"
+    ufo "^1.6.4"
     uint8array-extras "^1.5.0"
 
 "@ctrl/shared-torrent@^6.5.0":

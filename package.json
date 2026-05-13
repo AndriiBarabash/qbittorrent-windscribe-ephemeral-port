@@ -28,7 +28,7 @@
     "typescript-eslint": "^8.21.0"
   },
   "dependencies": {
-    "@ctrl/qbittorrent": "^9.11.0",
+    "@ctrl/qbittorrent": "^9.12.1",
     "async-lock": "^1.4.1",
     "axios": "^1.9.0",
     "dockerode": "^4.0.5",
