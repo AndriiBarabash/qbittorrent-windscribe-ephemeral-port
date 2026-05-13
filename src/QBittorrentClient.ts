@@ -7,13 +7,13 @@ export class QBittorrentClient {
 
   constructor(
     url: string,
-    username: string,
-    password: string,
+    username?: string,
+    password?: string,
+    apiKey?: string,
   ) {
     this.client = new QBittorrent({
       baseUrl: url,
-      username: username,
-      password: password,
+      ...(apiKey ? {apiKey} : {username, password}),
     });
   }
 
