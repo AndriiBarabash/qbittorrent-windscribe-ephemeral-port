@@ -1,58 +1,83 @@
-import {QBittorrent} from '@ctrl/qbittorrent';
+import axios, {type AxiosInstance} from 'axios';
+import qs from 'qs';
 
 export class QBittorrentClient {
 
-  private client: QBittorrent;
-  private currentHost?: string;
+  private http: AxiosInstance;
+  private sessionCookie?: string; // "NAME=VALUE" for Cookie header
 
   constructor(
     url: string,
-    username: string,
-    password: string,
+    private readonly username: string,
+    private readonly password: string,
   ) {
-    this.client = new QBittorrent({
-      baseUrl: url,
-      username: username,
-      password: password,
-    });
+    this.http = axios.create({baseURL: url.replace(/\/$/, '')});
   }
 
-  async updateConnection(): Promise<{ hostId: string; version: string; }> {
-    // login if not logged in already
-    if (!await this.client.login()) {
-      throw new Error('Failed to connect to client');
-    }
+  async updateConnection(): Promise<{hostId: string; version: string}> {
+    await this.login();
 
-    const apiversion = await this.client.getApiVersion();
-    const version = await this.client.getAppVersion();
+    const [apiVersion, appVersion] = await Promise.all([
+      this.http.get<string>('/api/v2/app/webapiVersion', {headers: this.authHeaders()}),
+      this.http.get<string>('/api/v2/app/version', {headers: this.authHeaders()}),
+    ]);
 
-    // report status
     return {
-      hostId: apiversion,
-      version: version,
+      hostId: apiVersion.data,
+      version: appVersion.data,
     };
   }
 
-  async getPort() {
-    // make sure we are connected
+  async getPort(): Promise<number> {
     await this.updateConnection();
 
-    const {listen_port: listenPort} = await this.client.getPreferences();
+    const prefs = await this.http.get<{listen_port: number}>(
+      '/api/v2/app/preferences',
+      {headers: this.authHeaders()},
+    );
 
-    return listenPort;
+    return prefs.data.listen_port;
   }
 
   async updatePort(port: number): Promise<void> {
-    // make sure we are connected
     await this.updateConnection();
 
-    // update port
-    await this.client.setPreferences({
-      listen_port: port,
-      random_port: false, // turn of random port as well
-    });
+    await this.http.post(
+      '/api/v2/app/setPreferences',
+      qs.stringify({json: JSON.stringify({listen_port: port, random_port: false})}),
+      {headers: this.authHeaders()},
+    );
 
     console.log('Client port update requested.');
+  }
+
+  private async login(): Promise<void> {
+    const response = await this.http.post(
+      '/api/v2/auth/login',
+      qs.stringify({username: this.username, password: this.password}),
+      {
+        // Follow redirects but capture Set-Cookie from the login response
+        maxRedirects: 0,
+        validateStatus: (s) => s < 400,
+      },
+    );
+
+    // qBittorrent ≤5.1.x sets "SID=...", ≥5.2 sets "QBT_SID_<port>=..."
+    const setCookie = response.headers['set-cookie'];
+    const sidCookie = (Array.isArray(setCookie) ? setCookie : [setCookie ?? ''])
+      .map((c) => c.split(';')[0].trim())
+      .find((c) => c.startsWith('SID=') || c.startsWith('QBT_SID_'));
+
+    if (!sidCookie) {
+      throw new Error('Invalid cookie');
+    }
+
+    this.sessionCookie = sidCookie;
+  }
+
+  private authHeaders(): Record<string, string> {
+    if (!this.sessionCookie) throw new Error('Not logged in');
+    return {Cookie: this.sessionCookie};
   }
 
 }
