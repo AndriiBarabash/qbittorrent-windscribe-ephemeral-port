@@ -335,7 +335,7 @@ export class WindscribeClient {
     }
   }
 
-  private async removeEphemeralPort(csrfInfo: CsrfInfo): Promise<void> {
+  async removeEphemeralPort(csrfInfo: CsrfInfo): Promise<void> {
     try {
       const sessionCookie = await this.getSession();
 
@@ -367,7 +367,7 @@ export class WindscribeClient {
     }
   }
 
-  private async requestMatchingEphemeralPort(csrfInfo: CsrfInfo): Promise<PortForwardingInfo> {
+  async requestMatchingEphemeralPort(csrfInfo: CsrfInfo): Promise<PortForwardingInfo> {
     try {
       const sessionCookie = await this.getSession();
 

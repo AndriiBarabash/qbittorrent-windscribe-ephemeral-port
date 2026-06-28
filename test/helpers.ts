@@ -21,6 +21,9 @@ export const hasQbittorrentConfig = Boolean(
   env('CLIENT_URL') && (env('CLIENT_API_KEY') || (env('CLIENT_USERNAME') && env('CLIENT_PASSWORD'))),
 );
 
+// Destructive tests mutate real state, so they only run when explicitly opted in.
+export const runDestructive = ['1', 'true', 'yes'].includes((env('RUN_DESTRUCTIVE') ?? '').toLowerCase());
+
 export function newWindscribeClient(): WindscribeClient {
   // A Map-backed cache persists in-memory, so the login from the first test is
   // reused by the later stage tests (a single authentication per run).
