@@ -1,6 +1,6 @@
 {
   "name": "qbittorrent-windscribe-ephemeral-port",
-  "version": "2.0.2",
+  "version": "1.4.0",
   "description": "",
   "keywords": [],
   "license": "MIT",
@@ -11,6 +11,8 @@
     "start": "node --import tsx src/index.ts",
     "dev": "node --watch --import tsx src/index.ts",
     "dev:debug": "node --watch --inspect-brk --import tsx src/index.ts",
+    "test": "node --import tsx --test test/*.integration.test.ts",
+    "test:destructive": "RUN_DESTRUCTIVE=1 node --import tsx --test test/*.destructive.integration.test.ts",
     "lint": "eslint .",
     "build": "tsc"
   },
