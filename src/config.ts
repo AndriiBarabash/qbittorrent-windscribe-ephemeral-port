@@ -136,7 +136,7 @@ export function getConfig(): Config {
     if (entry.type == Number) {
       const intValue = parseInt(value);
       if (isNaN(intValue)) {
-        throw new Error(`Environment variable ${entry.envVariableName}`);
+        throw new Error(`Environment variable ${entry.envVariableName} must be a valid number`);
       }
       return [name, intValue];
     }
