@@ -9,6 +9,7 @@
   "type": "module",
   "scripts": {
     "start": "node --import tsx src/index.ts",
+    "doctor": "node --import tsx doctor.ts",
     "dev": "node --watch --import tsx src/index.ts",
     "dev:debug": "node --watch --inspect-brk --import tsx src/index.ts",
     "lint": "eslint .",

@@ -5,6 +5,7 @@ import qs from 'qs';
 import crypto from 'crypto';
 import * as OTPAuth from 'otpauth';
 import {solveCaptcha} from './CaptchaSolver.js';
+import {CheckResult, runCheck, skipped} from './HealthCheck.js';
 
 
 const lock = new AsyncLock();
@@ -274,6 +275,50 @@ export class WindscribeClient {
    */
   async verifyLogin(): Promise<string> {
     return this.getSession(true);
+  }
+
+  /**
+   * Read-only health check of the Windscribe-side flow: authentication, the
+   * account/CSRF page, and the port-forwarding read. Each stage is reported
+   * independently so a failure points at exactly which call broke. Performs no
+   * mutations (does not create, delete, or change any port).
+   */
+  async diagnose(): Promise<CheckResult[]> {
+    const results: CheckResult[] = [];
+
+    // Stage 1: authenticate against the API (AuthToken/login + Session).
+    const login = await runCheck('Windscribe login (api.windscribe.com)', async () => {
+      const hash = await this.verifyLogin();
+      // only show the non-secret prefix (userId:sessionType:issuedAt)
+      return `session ${hash.split(':').slice(0, 3).join(':')}:***`;
+    });
+    results.push(login);
+
+    // Downstream stages need a valid session; skip them if login failed.
+    if (login.status !== 'ok') {
+      results.push(skipped('Windscribe account / CSRF (myaccount)', 'login failed'));
+      results.push(skipped('Windscribe port forwarding (staticips/load)', 'login failed'));
+      return results;
+    }
+
+    // Stage 2: load the account page and extract the CSRF token.
+    results.push(await runCheck('Windscribe account / CSRF (myaccount)', async () => {
+      const csrf = await this.getMyAccountCsrfToken();
+      return `csrf token ok (ctime ${csrf.csrfTime})`;
+    }));
+
+    // Stage 3: read the current port-forwarding state.
+    results.push(await runCheck('Windscribe port forwarding (staticips/load)', async () => {
+      const info = await this.getPortForwardingInfo();
+      if (info.epfExpires === 0) {
+        return 'no ephemeral port currently configured';
+      }
+      const expires = new Date(info.epfExpires * 1000).toISOString().slice(0, 10);
+      const intNote = info.ports[1] !== undefined && info.ports[1] !== info.ports[0] ? ` (int ${info.ports[1]})` : '';
+      return `port ${info.ports[0]}${intNote}, epf started ${expires}`;
+    }));
+
+    return results;
   }
 
   private async getMyAccountCsrfToken(forceLogin: boolean = false): Promise<CsrfInfo> {
